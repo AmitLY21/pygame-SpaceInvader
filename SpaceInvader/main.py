@@ -1,5 +1,6 @@
 import random
 import math
+import time
 
 import pygame
 
@@ -28,6 +29,13 @@ def change_bg_color(color):
     pygame.display.update()
 
 
+# --------------------Score------------------------
+score_value = 0
+last_res = 1
+font = pygame.font.Font('font/ARCADECLASSIC.TTF', 32)
+textX = 10
+textY = 10
+
 # --------------------Player------------------------
 # Player Details
 player_img = pygame.image.load('img/player2.png')
@@ -51,13 +59,17 @@ enemyY_change = []
 num_of_enemies = 6
 enemy_height = 64
 enemy_width = 64
-for i in range(num_of_enemies):
-    enemy_img.append(pygame.image.load('img/alien' + str(random.randint(1, 3)) + '.png'))
-    # Enemy Movement & Start Point
-    enemyX.append(random.randint(0, width - enemy_width - 1))
-    enemyY.append(random.randint(50, int(height / 3 - enemy_height)))
-    enemyX_change.append(0.15)
-    enemyY_change.append(40)
+
+
+def spawn_enemies():
+    for i in range(num_of_enemies):
+        enemy_img.append(pygame.image.load('img/alien' + str(random.randint(1, 3)) + '.png'))
+        # Enemy Movement & Start Point
+        enemyX.append(random.randint(0, width - enemy_width - 1))
+        enemyY.append(random.randint(50, int(height / 3 - enemy_height)))
+        enemyX_change.append(0.15)
+        enemyY_change.append(40)
+
 
 # --------------------Bullet------------------------
 bullet_img = pygame.image.load('img/bullet.png')
@@ -69,12 +81,6 @@ bulletY_change = 0.5
 # Ready - you cant see the bullet on the screen
 # Fire - the bullet is currently moving
 bullet_state = "ready"
-
-# --------------------Score------------------------
-score_value = 0
-font = pygame.font.Font('font/ARCADECLASSIC.TTF', 32)
-textX = 10
-textY = 10
 
 # Game Over
 over_font = pygame.font.Font('font/ARCADECLASSIC.TTF', 64)
@@ -110,14 +116,49 @@ def fire_bullet(x, y):
     screen.blit(bullet_img, (x + 16, y - 52))
 
 
-def is_collision(enemyX, enemyY, bulletX, bulletY):
+def is_collision(enemyX, enemyY, bulletX, bulletY, dis):
     distance = math.sqrt((enemyX - bulletX) ** 2 + (enemyY - bulletY) ** 2)
-    if distance < 27:
+    if distance < dis:
         return True
     return False
 
+
+def message_to_screen(message, antialias, color, pos=(250, 250)):
+    text = over_font.render(message, antialias, color)
+    screen.blit(text, pos)
+
+
+# Pause function
+def paused():
+    pause = True
+    while pause:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_c:
+                    pause = False
+                elif event.key == pygame.K_q:
+                    pygame.quit()
+                    quit()
+
+        screen.fill('black')
+        message_to_screen("PAUSED", True, [232, 232, 232], (100, 200))
+        message_to_screen("Press q  to Quit", True, [232, 232, 232], (100, 300))
+        message_to_screen("Press c  to continue", True, [232, 232, 232], (100, 400))
+        pygame.display.update()
+
+
+def game_over():
+    game_over_text()
+    pygame.mixer.music.stop()
+
+
 # Game Loop
 running = True
+spawn_enemies()
 while running:
     # bg-color
     screen.fill('#151515')
@@ -144,6 +185,8 @@ while running:
                     shoot_sound.play()
                     bulletX = playerX
                     fire_bullet(bulletX, bulletY)
+            if event.key == pygame.K_ESCAPE:
+                paused()
 
         # Key up: the keys unpressed and reset the change values to 0 both for up&down or right&left
         if event.type == pygame.KEYUP:
@@ -158,6 +201,12 @@ while running:
     if height / 2 <= playerY + playerY_change <= height - player_height:
         playerY += playerY_change
 
+    if score_value > 1 and int(score_value / 10) == last_res:
+        for i in range(num_of_enemies):
+            enemyX_change[i] *= 1.25
+        last_res += 1
+        bulletY_change *= 1.20
+
     # Enemy Movement -  Setting enemies boundary's moving from side to side
     for i in range(num_of_enemies):
 
@@ -171,6 +220,8 @@ while running:
             break
 
         enemyX[i] += enemyX_change[i]
+
+        # change direction
         if enemyX[i] <= 0:
             enemyX_change[i] = abs(enemyX_change[i])
             enemyY[i] += enemyY_change[i]
@@ -179,7 +230,7 @@ while running:
             enemyY[i] += enemyY_change[i]
 
         # Collision
-        if is_collision(enemyX[i], enemyY[i], bulletX, bulletY):
+        if is_collision(enemyX[i], enemyY[i], bulletX, bulletY, 35):
             bulletY = playerY
             bullet_state = "ready"
             score_value += 1
@@ -187,12 +238,12 @@ while running:
             enemyX[i] = random.randint(0, width - enemy_width - 1)
             enemyY[i] = random.randint(50, int(height / 3 - enemy_height))
 
-        if is_collision(enemyX[i], enemyY[i], playerX, playerY):
+        if is_collision(enemyX[i], enemyY[i], playerX, playerY, 50):
             player_death.play()
             for j in range(num_of_enemies):
                 enemyY[j] = 2000
-            game_over_text()
-            pygame.mixer.music.stop()
+            playerY = 2000
+            game_over()
 
         enemy(enemyX[i], enemyY[i], i)
 
